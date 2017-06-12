@@ -347,7 +347,7 @@ switch ($action) {
                     $resps = $respsallparticipants;
                     break;
                 default:     // Members of a specific group.
-                    $sql = "SELECT r.id, r.survey_id, r.submitted, r.userid
+                    $sql = "SELECT DISTINCT r.id, r.survey_id, r.submitted, r.userid
                         FROM {questionnaire_response} r,
                             {groups_members} gm
                          WHERE r.survey_id = ? AND
@@ -534,6 +534,62 @@ switch ($action) {
         // and if there are more goups than 1 (or if user can view all groups).
         if (is_array($questionnairegroups) && $groupmode > 0) {
             $groupselect = groups_print_activity_menu($cm, $url->out(), true);
+
+            /**
+             * Leo's stuff
+             * erase the unwanted groups from group select
+             *
+             * So, appearently questionnaire pulls the data again when building the html select.
+             * the aproach this time, is fixing the html directly
+             */
+
+            $selectBox = new DOMDocument();
+            $selectBox->loadHTML('<?xml encoding="utf-8" ?>'.$groupselect);
+            //get the select box created by questionnaire
+            $options = $selectBox->getElementsByTagName("option");
+            //get all elements that are a select's option
+
+            /**
+             * go through all those elements and if they do not fit the allowed cohorts erase them
+             */
+            $erasedDom = true;
+            //the foreach "jumps" over one element in case of erasing the one before him
+            //this flag is to re-run the for each of the options every time something has been erased
+            while($erasedDom) {
+                $erasedDom = false;
+                foreach ($options as $option) {
+                    foreach ($option->attributes as $attr) {
+                        if($attr->name == "value" && $attr->nodeValue != 0) {
+                            //search for the value attribute holding the group's id
+                            if(isset($permsShowGroups) && array_search($attr->nodeValue, $permsShowGroups) === false){
+                                //if the group does not appear on the permmited groups id's, erase the option tag from the html
+                                $option->parentNode->removeChild($option);
+                                $erasedDom = true;
+                            } else  {
+                                $sql = "SELECT DISTINCT R.id, R.survey_id, R.submitted, R.username
+                                                FROM {questionnaire_response} R, {groups_members} GM
+                                                WHERE R.survey_id = ? AND
+                                                R.complete='y'
+                                                AND  " . $castsql . "=GM.userid
+                                                AND GM.groupid = ".$attr->nodeValue;
+                                $optionResps = $DB->get_records_sql($sql, array($sid));
+
+                                $option->textContent = $option->textContent." (".count($optionResps).")";
+                            }
+                        }
+                    }
+                }
+            }
+
+
+            $groupselect = $selectBox->saveHTML();
+            //rewrite the select part of the html without the not permitted groups
+
+            /**
+             * End of leo's stuff
+             */
+
+
             // Count number of responses in each group.
             foreach ($questionnairegroups as $group) {
                 $sql = 'SELECT COUNT(r.id) ' .
@@ -566,10 +622,14 @@ switch ($action) {
         if ($groupmode > 0) {
             switch ($currentgroupid) {
                 case 0:     // All participants.
-                    $resps = $respsallparticipants;
+                    if(isset($respsallparticipants)){
+                        $resps = $respsallparticipants;
+                    } else {
+                        $resps = '';
+                    }
                     break;
                 default:     // Members of a specific group.
-                    $sql = 'SELECT r.id, gm.id as groupid ' .
+                    $sql = 'SELECT DISTINCT r.id, gm.id as groupid ' .
                            'FROM {questionnaire_response} r ' .
                            'INNER JOIN {groups_members} gm ON r.userid = gm.userid ' .
                            'WHERE r.survey_id = ? AND r.complete = ? AND gm.groupid = ?';
@@ -612,8 +672,11 @@ switch ($action) {
         $respinfo .= $questionnaire->renderer->help_icon('orderresponses', 'questionnaire');
         $questionnaire->page->add_to_page('respondentinfo', $respinfo);
 
-        $ret = $questionnaire->survey_results(1, 1, '', '', '', $uid = false, $currentgroupid, $sort);
-
+        if($currentgroupid == 0) {
+            $ret = $questionnaire->survey_results(1, 1, '', '', '', $uid = false, $questionnairegroups, $sort);
+        } else {
+            $ret = $questionnaire->survey_results(1, 1, '', '', '', $uid = false, $currentgroupid, $sort);
+        }
         echo $questionnaire->renderer->render($questionnaire->page);
 
         // Finish the page.
@@ -663,7 +726,7 @@ switch ($action) {
                         $resps = $respsallparticipants;
                         break;
                     default:     // Members of a specific group.
-                        $sql = 'SELECT r.id, r.survey_id, r.submitted, r.userid ' .
+                        $sql = 'SELECT DISTINCT r.id, r.survey_id, r.submitted, r.userid ' .
                                'FROM {questionnaire_response} r ' .
                                'INNER JOIN {groups_members} gm ON r.userid = gm.userid ' .
                                'WHERE r.survey_id = ? AND r.complete = ? AND gm.groupid = ? ' .
