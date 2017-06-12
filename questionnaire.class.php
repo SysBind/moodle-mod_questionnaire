@@ -2487,7 +2487,7 @@ class questionnaire {
                                r.complete='y'
                          ORDER BY r.id";
             } else { // Members of a specific group.
-                $sql = "SELECT r.id, r.survey_id
+                $sql = "SELECT DISTINCT r.id, r.survey_id
                           FROM {questionnaire_response} r,
                                 {groups_members} gm
                          WHERE r.survey_id='{$this->survey->id}' AND

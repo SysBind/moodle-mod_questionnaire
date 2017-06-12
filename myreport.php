@@ -210,7 +210,7 @@ switch ($action) {
                     $iscurrentgroupmember = true;
                 }
                 // Current group members.
-                $sql = 'SELECT r.id, r.survey_id, r.submitted, r.userid '.
+                $sql = 'SELECT DISTINCT r.id, r.survey_id, r.submitted, r.userid '.
                        'FROM {questionnaire_response} r, {groups_members} gm '.
                        'WHERE r.survey_id = ? AND r.complete = \'y\' AND gm.groupid = ? AND r.userid = gm.userid '.
                        'ORDER BY r.id';
