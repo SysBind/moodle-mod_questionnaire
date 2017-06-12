@@ -2481,7 +2481,7 @@ class questionnaire {
                          ORDER BY r.id";
                 // All participants or all members of a group.
             } else if ($currentgroupid == 0) {
-                $sql = "SELECT r.id, r.survey_id, r.userid as userid
+                $sql = "SELECT DISTINCT r.id, r.survey_id, r.userid as userid
                           FROM {questionnaire_response} r
                          WHERE r.survey_id='{$this->survey->id}' AND
                                r.complete='y'

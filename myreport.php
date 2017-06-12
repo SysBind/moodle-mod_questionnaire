@@ -327,9 +327,23 @@ switch ($action) {
                        'FROM {questionnaire_response} r, {groups_members} gm '.
                        'WHERE r.survey_id = ? AND r.complete = \'y\' AND gm.groupid = ? AND r.userid = gm.userid '.
                        'ORDER BY r.id';
-                $currentgroupresps = $DB->get_records_sql($sql, [$sid, $currentgroupid]);
+                if (!($currentgroupresps = $DB->get_records_sql($sql, array($sid, $currentgroupid)))) {
+                    $currentgroupresps = array();
+                }
+                $SESSION->questionnaire->numcurrentgroupresps = count ($currentgroupresps);
 
             } else {
+                /**
+                 * Added By LEO - 31.12.2016
+                 * Not Show anything if there are no groups
+                 */
+
+                print_error("<br/><br/>"."אין קבוצות לראות כרגע.");
+
+                /**
+                 * End of addition by LEO
+                 */
+
                 // Groupmode = separate groups but user is not member of any group
                 // and does not have moodle/site:accessallgroups capability -> refuse view responses.
                 if (!$questionnaire->canviewallgroups) {
