@@ -192,7 +192,120 @@ switch ($action) {
             if ($groupmode == 2 || $questionnaire->canviewallgroups) {
                 $questionnairegroups = groups_get_all_groups($course->id);
             }
+            /**
+             * Added By LEO - 31.12.2016
+             * Not Show anything if there are no groups and the user is not admin
+             */
+            if(array_search($USER->id, explode(",", $CFG->siteadmins)) === false){
+                $cohorts = [];
+                $permsShowGroups = [];
+                $permscontext = context_coursecat::instance($COURSE->category);
 
+
+
+                /**
+                 * Get the Enrolments of this tree
+                 */
+                $rolecontext = context_course::instance($COURSE->id);
+                $enrolments = array();
+
+                $curr_enrolments = $DB->get_records('role_assignments', array("userid" => $USER->id, "contextid" => $rolecontext->id));
+                foreach ($curr_enrolments as $enrolment) {
+                    $enrolments[] = $enrolment->roleid;
+                }
+                $enrolmentcat = $DB->get_record('course_categories', array("id" => $COURSE->category));
+                $rolecontext = context_coursecat::instance($enrolmentcat->id);
+                while($enrolmentcat) {
+                    $rolecontext = context_coursecat::instance($enrolmentcat->id);
+                    $curr_enrolments =$DB->get_records('role_assignments', array("userid" => $USER->id, "contextid" => $rolecontext->id));
+                    foreach ($curr_enrolments as $enrolment) {
+                        $enrolments[] = $enrolment->roleid;
+                    }
+                    $enrolmentcat = $DB->get_record('course_categories', array("id" => $enrolmentcat->parent));
+                }
+
+
+
+                /**
+                 * Get all the cohorts the user has permission to see
+                 */
+                foreach ($enrolments as $enrolment) {
+                    $allowedusergroups = $DB->get_records('mdimport_role_cohort_perms', array("contextid" => $permscontext->id, "roleid" => $enrolment));
+
+
+                    foreach ($allowedusergroups as $group) {
+                        //go through all the allowed cohorts for this user and add them to the $cohorts array
+                        if($cohort = $DB->get_field('cohort', 'idnumber', array('id' => $group->cohortid))) {
+                            array_push($cohorts, $cohort);
+                        }
+                    }
+                }
+
+                /**
+                 * erase from the cohorts already pulled by the questionnaire and erase those that are not allowed
+                 */
+                foreach ($questionnairegroups as $key => $group) {
+                    //go through each group
+                    $groupcohort = explode("-", $group->idnumber);
+                    $groupcohort = $groupcohort[1];
+                    //the the cohort name of the group
+                    $srch = array_search($groupcohort, $cohorts);
+                    if($srch === false) {
+                        //search for the cohort if it is in the allowed cohorts array, if not, take it out from the questionnaire
+                        unset($questionnairegroups[$key]);
+                    } else {
+                        //if the user is permitted to see this group, add the group's id to an array for later use
+                        $permsShowGroups[] = $key;
+
+                    }
+                }
+
+                /**
+                 * This part has been changed in order tu pull all responses ONLY from allowed groups instead of everyone
+                 */
+                // Get all responses for further use in viewbyresp and deleteall etc.
+                // All participants.
+                if(count($questionnairegroups) > 0) {
+                    $sql = "SELECT DISTINCT(R.id || '-' || R.survey_id || '-' || R.username || '-' || GM.id) AS unID, R.id, R.survey_id, R.submitted, R.username
+                     FROM {questionnaire_response} R, {groups_members} GM
+                     WHERE R.survey_id = ? AND
+                           R.complete='y'
+                     AND  " . $castsql . "=GM.userid
+                     AND (";
+                    $i = 0;
+                    $max = count($questionnairegroups);
+
+                    foreach ($questionnairegroups as $key => $group) {
+                        //go through every allowed group and add it to the condition of the query
+                        //in order to print responses only for him
+                        $sql .= "GM.groupid = ".$key;
+                        $i++;
+                        if($i < $max) {
+                            $sql .= " OR ";
+                        }
+                    }
+
+                    $sql .=")       ORDER BY R.id";
+
+                    /**
+                     * this always was like this and un-FUCKING-commented
+                     */
+                    if (!($respsallparticipants = $DB->get_records_sql($sql, array($sid)))) {
+                        $respsallparticipants = array();
+                    }
+                    $SESSION->questionnaire->numrespsallparticipants = count ($respsallparticipants);
+                    $SESSION->questionnaire->numselectedresps = $SESSION->questionnaire->numrespsallparticipants;
+
+                } else {
+                    $respsallparticipants = array();
+                    $SESSION->questionnaire->numrespsallparticipants = count ($respsallparticipants);
+                    $SESSION->questionnaire->numselectedresps = $SESSION->questionnaire->numrespsallparticipants;
+                }
+            }
+
+            /**
+             * End of addition by LEO
+             */
             if (!empty($questionnairegroups)) {
                 $groupscount = count($questionnairegroups);
                 foreach ($questionnairegroups as $key) {
