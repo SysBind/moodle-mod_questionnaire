@@ -137,6 +137,38 @@ class rank extends base {
                         $result->averagevalue = $value[$key] / $result->num;
                     }
                 }
+
+                // Standard Deviation (MD-BIU : Issue 26)
+                if (!empty ($rankvalue)) {
+                    $sql = "SELECT r.id, c.content, r.rank, c.id AS choiceid
+                    FROM {questionnaire_quest_choice} c, {questionnaire_{$this->response_table}} r
+                    WHERE r.choice_id = c.id
+                    AND c.question_id = ".$this->id."
+                    AND r.rank >= 0{$rsql}
+                    ORDER BY choiceid";
+
+                    $cresults = $DB->get_records_sql($sql, $params);
+
+                    $value = array();
+
+                    foreach ($cresults as $cresult) {
+                        if (isset ($value[$cresult->choiceid])) {
+                            $value[$cresult->choiceid] += ($rankvalue[$cresult->rank] - $results[$cresult->choiceid]->averagevalue) * ($rankvalue[$cresult->rank]-$results[$cresult->choiceid]->averagevalue);
+                        } else {
+                            $value[$cresult->choiceid] = ($rankvalue[$cresult->rank] - $results[$cresult->choiceid]->averagevalue) * ($rankvalue[$cresult->rank] - $results[$cresult->choiceid]->averagevalue);
+                        }
+                    }
+                    foreach ($value as $choiceid => $stdvalue){
+                        if($results[$choiceid]->num > 1) {
+                            $results[$choiceid]->stdvalue = sqrt($stdvalue / ($results[$choiceid]->num - 1));
+                            $this->counts[$results[$choiceid]->content]->stdvalue = $results[$choiceid]->stdvalue;
+                        } else {
+                            $this->counts[$results[$choiceid]->content]->stdvalue = 0.00;
+                        }
+                    }
+                }
+
+
                 // Reindex by 'content'. Can't do this from the query as it won't work with MS-SQL.
                 foreach ($results as $key => $result) {
                     $results[$result->content] = $result;
@@ -190,6 +222,7 @@ class rank extends base {
                     $this->counts[$ccontent]->num = $rows[$ccontent]->num;
                     if (isset($rows[$ccontent]->averagevalue)) {
                         $avgvalue = $rows[$ccontent]->averagevalue;
+                        $stdvalue = $rows[$ccontent]->stdvalue;
                         $osgood = false;
                         if ($this->question->precise == 3) { // Osgood's semantic differential.
                             $osgood = true;
@@ -199,12 +232,14 @@ class rank extends base {
                         }
                     } else {
                         $avgvalue = null;
+                        $stdvalue = null;
                     }
                 } else {
                     $avg = 0;
                 }
                 $this->counts[$ccontent]->avg = $avg;
                 $this->counts[$ccontent]->avgvalue = $avgvalue;
+                $this->counts[$ccontent]->stdvalue = $stdvalue;
             }
             $output .= \mod_questionnaire\response\display_support::mkresavg($this->counts, count($rids), $this->question->choices,
                 $this->question->precise, $prtotal, $this->question->length, $sort, $stravgvalue);

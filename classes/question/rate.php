@@ -146,7 +146,7 @@ class rate extends base {
         } else {
             $width = '59%';
             $colwidth = (40 / $this->length).'%';
-            $textalign = 'left';
+            $textalign = 'right';
         }
 
         $choicetags->qelements['headerrow']['col1width'] = $width;

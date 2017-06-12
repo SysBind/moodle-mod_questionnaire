@@ -156,7 +156,7 @@ class display_support {
             $table->head = array($strrespondent, $strresponse);
             $table->size = array('*', '*');
         } else {
-            $table->align = array('left');
+            $table->align = array('right');
             $table->head = array($strresponse);
             $table->size = array('*');
         }
@@ -382,16 +382,16 @@ class display_support {
                         // JR JUNE 2012 do not display meaningless average rank values for Osgood.
                     } else {
                         if ($avg) {
-                            $stravgval = '';
+                            $strstdval = '';
                             if ($stravgvalue) {
-                                $stravgval = '('.sprintf('%.1f', $avgvalue).')';
+                                $strstdval = '('.sprintf('%.1f', $stdvalue).')';
                             }
                             if ($isna) {
-                                $table->data[] = [format_text($content, FORMAT_HTML, ['noclean' => true]), $out,
-                                    sprintf('%.1f', $avg).'&nbsp;'.$stravgval, $nbna];
+                                $table->data[] = array(format_text($content, FORMAT_HTML), $out, sprintf('%.1f', $avgvalue).
+                                    '&nbsp;'.$strstdval, $nbna);
                             } else {
-                                $table->data[] = [format_text($content, FORMAT_HTML, ['noclean' => true]), $out,
-                                    sprintf('%.1f', $avg).'&nbsp;'.$stravgval];
+                                $table->data[] = array(format_text($content, FORMAT_HTML), $out, sprintf('%.1f', $avgvalue).
+                                    '&nbsp;'.$strstdval);
                             }
                         } else if ($nbna != 0) {
                             $table->data[] = array(format_text($content, FORMAT_HTML, ['noclean' => true]), $out, '', $nbna);
