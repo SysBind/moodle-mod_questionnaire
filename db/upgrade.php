@@ -629,7 +629,30 @@ function xmldb_questionnaire_upgrade($oldversion=0) {
         // Questionnaire savepoint reached.
         upgrade_mod_savepoint(true, 2017050101, 'questionnaire');
     }
+    if ($oldversion < 2015100700) {
+        unset($table);
 
+        $table = new xmldb_table('questionnaire_message_sent');
+        $table->add_field('id', XMLDB_TYPE_INTEGER, '18', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+        $table->add_field('course', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('module', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('group', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('startdate', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('sent', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, 0);
+
+        $table->add_key('primary', XMLDB_KEY_PRIMARY, array('id'));
+        $table->add_key('courseid', XMLDB_KEY_FOREIGN, array('course'), 'course', array('id'));
+        $table->add_key('moduleid', XMLDB_KEY_FOREIGN, array('module'), 'course_modules', array('id'));
+        $table->add_key('groupid', XMLDB_KEY_FOREIGN, array('group'), 'groups', array('id'));
+
+        $table->add_index('mail_group', XMLDB_INDEX_NOTUNIQUE, array('module', 'group', 'startdate'));
+
+        if (!$dbman->table_exists($table)) {
+            $dbman->create_table($table);
+        }
+
+        upgrade_mod_savepoint(true, 2015100700, 'questionnaire');
+    }
     return $result;
 }
 

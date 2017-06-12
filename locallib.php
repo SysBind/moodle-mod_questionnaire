@@ -39,7 +39,8 @@
  */
 
 defined('MOODLE_INTERNAL') || die();
-
+use core_availability\info;
+use core_availability\info_module;
 require_once($CFG->libdir.'/eventslib.php');
 require_once($CFG->dirroot.'/calendar/lib.php');
 // Constants.
@@ -1025,6 +1026,86 @@ function questionnaire_prep_for_questionform($questionnaire, $qid, $qtype) {
     }
     return $question;
 }
+
+//mailsender
+
+function questionnaire_cron(){
+    global $CFG, $USER, $DB;
+
+    $timenow   = time();
+    $modules = $DB->get_records('course_modules',null,null,'id,course,instance,availability');
+    foreach ($modules as  $module){
+        $cm = get_coursemodule_from_instance("questionnaire", $module->instance, $module->course);
+        $cm = cm_info::create($cm);
+        if(!is_null($module->availability)){
+            $condition = json_decode($module->availability);
+            $conditions = questionnaire_get_condition($condition);
+            foreach ($conditions as $conditionset){
+                foreach ($conditionset as $condition) {
+                    switch ($condition->type){
+                        case 'date': if ($condition->d == '>='){
+                            if($condition->t > $timenow && $timenow+60*60*24 > $condition->t ){
+                                $groupcondition = end($conditionset);
+                                if($groupcondition->type == 'group'){
+                                    $needtosend = $DB->get_record('questionnaire_message_sent', array(
+                                        // 'group' => $groupcondition->id,
+                                        'startdate' => $condition->t
+                                    ),'sent');
+                                    if (!$needtosend || (isset($needtosend) && is_object($needtosend) && !$needtosend->sent)){
+                                        $usesers = groups_get_members($groupcondition->id);
+                                        $conditiondate = New DateTime($condition->t);
+                                        foreach ($usesers as $user) {
+                                            $eventdata = new \core\message\message();
+                                            $eventdata->component           = 'mod_questionnaire';
+                                            $eventdata->name                = 'quistionnaire';
+                                            if (empty($CFG->forum_replytouser)) {
+                                                $eventdata->userfrom = core_user::get_noreply_user();
+                                            }
+                                            $eventdata->userto              = $user;
+                                            $eventdata->subject             = get_string('newsurveysubject','quesionnaire');
+                                            $eventdata->fullmessage         = get_string('newsurveyfullmessage','quesionnaire',$conditiondate->format('Y-m-d H:i:s'));
+                                            $eventdata->fullmessageformat   = FORMAT_HTML;
+                                            $eventdata->fullmessagehtml     = get_string('newsurveyfullmessagehtml','quesionnaire',$conditiondate->format('Y-m-d H:i:s'));
+                                            $eventdata->notification        = 1;
+
+                                            $mailresult = message_send($eventdata);
+                                            if ($mailresult){
+                                                mtrace('mail was sent to '.$user);
+                                            } else {
+                                                mtrace('mail not sent to '. $user);
+                                            }
+                                        }
+                                        $dataobject = new stdClass();
+                                        $dataobject->course = $module->course;
+                                        $dataobject->module = $module->id;
+                                        $dataobject->group = $groupcondition->id;
+                                        $dataobject->startdate = $condition->t;
+                                        $dataobject->sent = true;
+                                        $DB->insert_record('questionnaire_message_sent', $dataobject);
+                                    }
+                                }
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    }
+}
+
+function questionnaire_get_condition(stdClass $availability) {
+    if(isset($availability->c) && is_array($availability->c)){
+        foreach ($availability->c as $c){
+            $condition[] = questionnaire_get_condition($c);
+        }
+    } else {
+        $condition = $availability;
+
+    }
+    return $condition;
+}
+
 
 /**
  * Get the standard page contructs and check for validity.

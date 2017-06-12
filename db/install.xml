@@ -259,5 +259,24 @@
         <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
       </KEYS>
     </TABLE>
+    <TABLE NAME="questionnaire_message_sent" COMMENT="questionnaire_ message_sent table retrofitted from MySQL" PREVIOUS="questionnaire_feedback">
+        <FIELDS>
+            <FIELD SEQUENCE="true" LENGTH="18"  TYPE="int" NOTNULL="true" NAME="id" NEXT="course"/>
+            <FIELD SEQUENCE="false" LENGTH="18" TYPE="int" NOTNULL="true" NAME="course" PREVIOUS="id" NEXT="module"/>
+            <FIELD SEQUENCE="false" LENGTH="18"  TYPE="int" NOTNULL="true" NAME="module" PREVIOUS="course" NEXT="group"/>
+            <FIELD SEQUENCE="false" LENGTH="18" TYPE="int" NOTNULL="true" NAME="group" PREVIOUS="module" NEXT="startdate"/>
+            <FIELD SEQUENCE="false" LENGTH="10" TYPE="int" NOTNULL="true" NAME="startdate" PREVIOUS="group" NEXT="sent"/>
+            <FIELD SEQUENCE="false" LENGTH="10" TYPE="int" NOTNULL="true" NAME="sent" PREVIOUS="startdate"/>
+        </FIELDS>
+        <KEYS>
+            <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+            <KEY NAME="courseid" TYPE="foreign" FIELDS="course" REFTABLE="course" REFFIELDS="id"/>
+            <KEY NAME="moduleid" FIELDS="module" TYPE="foreign" REFTABLE="course_modules" REFFIELDS="id"/>
+            <KEY NAME="groupid" FIELDS="group" TYPE="foreign" REFTABLE="groups" REFFIELDS="id"/>
+        </KEYS>
+        <INDEXES>
+            <INDEX NAME="mail_group" UNIQUE="false" FIELDS="module, group, startdate"/>
+        </INDEXES>
+    </TABLE>
   </TABLES>
 </XMLDB>
